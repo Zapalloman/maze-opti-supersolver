@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+
+# Rust
+super_solver/target/
+*.so
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+.claude/
