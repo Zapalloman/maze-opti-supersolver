@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Python wrapper over the native Rust maze solver.
 
-Mirrors the public surface of ``maze_api.solver`` so the benchmark can compare
-move-by-move with both the baseline and the previous 1D solver_v1.
+Mirrors the public surface of ``maze_api.solver`` so it can be compared
+move-by-move with the original solver. (Rust experiment; not used in the
+competition, which is pure Python.)
 """
 
 from __future__ import annotations
