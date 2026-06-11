@@ -429,10 +429,85 @@ def play_blind(host, port, seed=None, verbose=True):
 # CLI
 # --------------------------------------------------------------------------
 
+def _normalize(data: bytes) -> bytes:
+    """Tolerate judge-side noise: CRLF line endings and leading blank lines
+    (both would corrupt the byte-offset arithmetic if left in)."""
+    if b"\r" in data:
+        data = data.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    return data.lstrip(b"\n")
+
+
+def render_classic(data: bytes, moves) -> bytes:
+    """Mark the solution on the maze exactly like the course baseline
+    (maze_api.solver._render_solution): '.' on intermediate path cells,
+    'X' on the goal cell. Returns the canvas with one trailing newline."""
+    lw = _line_width(data)
+    start = _find_start(data)
+    _, exit_dir = _find_exit(data, lw)
+    step = {"N": -2 * lw, "S": 2 * lw, "E": 4, "W": -4}
+    n_path = len(moves) - 1 if exit_dir else len(moves)
+
+    canvas = bytearray(data)
+    cur = start
+    cells = []
+    for m in moves[:n_path]:
+        cur += step[m]
+        cells.append(cur)
+    for c in cells[:-1]:
+        if canvas[c] == 32:
+            canvas[c] = 46  # '.'
+    if cells and canvas[cells[-1]] == 32:
+        canvas[cells[-1]] = 88  # 'X'
+    return bytes(canvas).rstrip(b"\n") + b"\n"
+
+
+def pipe_mode(bidir=False, sep="", classic=False):
+    """Judge mode: maze on stdin, the answer on stdout, stats on stderr.
+
+    This is the contract of a competitive-programming judge:
+        python3 solver.py < maze.txt > moves.txt
+    stdout must carry nothing but the answer; exit code 0 means accepted.
+
+    With ``classic=True`` the stdout format instead replicates the course
+    baseline solver (Source / Moves / Move count / Elapsed seconds / Solved
+    maze) byte-for-byte, in case the judge was built around that output.
+    """
+    data = _normalize(sys.stdin.buffer.read())
+    t0 = time.perf_counter()
+    moves = (solve_bidirectional if bidir else solve)(data)
+    elapsed = time.perf_counter() - t0
+
+    if classic:
+        out = sys.stdout
+        out.write("Source: stdin\n")
+        out.write(f"Moves: {''.join(moves)}\n")
+        out.write(f"Move count: {len(moves)}\n")
+        out.write(f"Elapsed seconds: {elapsed:.9f}\n")
+        out.write("Solved maze:\n")
+        out.flush()
+        sys.stdout.buffer.write(render_classic(data, moves))
+    else:
+        sys.stdout.write(sep.join(moves) + "\n")
+    sys.stdout.flush()
+    print(f"[flood] moves={len(moves)} solve={elapsed*1000:.3f}ms",
+          file=sys.stderr)
+
+
 def _parse_args():
     p = argparse.ArgumentParser(description="Pure-Python flood-fill maze solver.")
     p.add_argument("--file")
     p.add_argument("--stdin", action="store_true")
+    p.add_argument("--pipe", action="store_true",
+                   help="Judge mode: maze on stdin, only the moves on stdout. "
+                        "Auto-enabled when stdin is redirected and no other "
+                        "mode is chosen.")
+    p.add_argument("--sep", default="",
+                   help="Separator between moves in --pipe output "
+                        "(default: none -> 'NNEES...').")
+    p.add_argument("--classic", action="store_true",
+                   help="In pipe mode, replicate the course baseline solver's "
+                        "output format (Source/Moves/Move count/Elapsed "
+                        "seconds/Solved maze) byte-for-byte.")
     p.add_argument("--size", type=int)
     p.add_argument("--seed", type=int, default=None)
     p.add_argument("--bidir", action="store_true", help="Use bidirectional flood fill.")
@@ -454,6 +529,13 @@ def main():
 
     if args.blind and not (args.file or args.stdin or args.size):
         play_blind(args.host, args.port, seed=args.seed)
+        return
+
+    # Judge mode: explicit --pipe, or stdin is a redirect/pipe and no other
+    # input mode was requested (so `solver.py < maze.txt` just works).
+    if args.pipe or not (args.file or args.stdin or args.size
+                         or sys.stdin.isatty()):
+        pipe_mode(bidir=args.bidir, sep=args.sep, classic=args.classic)
         return
 
     if args.file:

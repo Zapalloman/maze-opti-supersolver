@@ -1,12 +1,8 @@
-# super_solver (Rust — no se usa en la competencia)
+# super_solver (Rust — fuera de la competencia)
 
-> **Nota:** esta es una versión anterior del solver escrita en **Rust** (expuesta
-> a Python con `ctypes`). **No se usa en la competencia**, porque la final es en
-> **Python puro**. El solver que se ejecuta es `flood_solver/`. Esta carpeta se
-> conserva solo como referencia histórica / experimento.
-
-Solver nativo del laberinto en formato `maze_api`, escrito en Rust. Produce la
-**misma secuencia de movimientos, byte por byte**, que el solver original.
+Solver nativo en Rust (expuesto a Python con `ctypes`). Produce la misma
+secuencia de movimientos, byte por byte, que el solver original. No compite:
+la final es en Python puro (`flood_solver/`); se conserva como referencia.
 
 ## Build
 
